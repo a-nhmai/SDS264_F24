@@ -11,6 +11,11 @@ editor_options:
 library(maps)
 library(sf)
 library(readr)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(viridis)
+library(leaflet)
 ```
 
 ```{r}
