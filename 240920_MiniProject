@@ -1,0 +1,130 @@
+---
+title: "240920 Mini-Project"
+author: "Anh Mai"
+date: "2024-09-17"
+output: pdf_document
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+library(maps)
+library(sf)
+library(readr)
+```
+
+```{r}
+states_polygon <- as_tibble(map_data("state")) |>
+  select(region, group, order, lat, long)
+
+states_sf <- read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson") 
+
+species <- read_csv("~/**SDS264/Sds 264 F24/Submit/240920 Mini-Project/species-listings-by-state-totals-report.csv") 
+head(species)
+dim(species)
+
+species <- species |>
+  group_by(State) |>
+  mutate(count100 = if_else(`Number of Species Listings` > 100, "More than 100", "Less than 100")) |>
+  filter(!State %in% c("Outlying Caribbean Islands", "Virgin Islands", "Outlying Pacific Islands", "Northern Mariana Islands", "American Samoa", "Guam")) |>
+  rename(numSpecies = `Number of Species Listings`)
+
+unique(species$State)
+unique(states_sf$name)
+
+species_states_sf <- states_sf |>
+  left_join(species, by = c("name" = "State")) |>
+  filter(!(name %in% c("Alaska", "Hawaii")))
+
+species2 <- species |>
+  mutate(State = str_to_lower(State))
+
+species_states_polygon <- states_polygon |>
+  left_join(species2, by = c("region" = "State")) |>
+  filter(!(region %in% c("Alaska", "Hawaii")))
+
+
+```
+
+Numeric variable (static)
+```{r}
+species_states_polygon |>
+  ggplot(aes(x = long, y = lat, group = group))+
+  geom_polygon(aes(fill = numSpecies), color = "black")+
+  theme_void()+
+  scale_fill_viridis()+
+  labs(fill = "Number of listed species \nwith spatial current range \nbelieved to or known to \noccur",
+       caption = "https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed")
+```
+
+Numeric Variable (interactive)
+```{r}
+species_states_sf <- species_states_sf |>
+  mutate(labels = str_c(name, " - " ,numSpecies, " species listed"))
+
+leaflet(species_states_sf) |>
+  setView(-96, 37.8, 4) |>
+  addTiles() |>
+  addPolygons(
+    weight = 2,
+    opacity = 0.8,
+    color = ~ colorNumeric("YlGnBu", species_states_sf$numSpecies)(species_states_sf$numSpecies),
+    dashArray = "2",
+    fillOpacity = 1,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = species_states_sf$labels,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto"))
+```
+
+Categorical variable (static plot)
+```{r}
+species_states_polygon |>
+  ggplot(aes(x = long, y = lat, group = group)) +
+  geom_polygon(aes(fill = count100), color = "black")+
+  coord_map() +
+  theme_void() +
+  labs(fill = "Does the state have \nmore or less than \n100 listed species?") +
+  scale_fill_manual(values = c("#008000", "#AAFF00"))
+```
+
+
+Categorical variable (interactive plot)
+```{r}
+factpal <- colorFactor(
+  palette = c("#008000", "#AAFF00"),  
+  domain = c("Less than 100", "More than 100")
+)
+
+leaflet(species_states_sf) |>
+  setView(-96, 37.8, 4) |>
+  addTiles() |>
+  addPolygons(
+    weight = 2,
+    opacity = 1,
+    color = "black",
+    fillColor = ~ factpal(species_states_sf$count100),
+    dashArray = "3",
+    fillOpacity = 0.7,
+    highlightOptions = highlightOptions(
+      weight = 5,
+      color = "#666",
+      dashArray = "",
+      fillOpacity = 0.7,
+      bringToFront = TRUE),
+    label = species_states_sf$count100,
+    labelOptions = labelOptions(
+      style = list("font-weight" = "normal", padding = "3px 8px"),
+      textsize = "15px",
+      direction = "auto")) |>
+  addLegend(pal = factpal, values = ~species_states_sf$count100, 
+            opacity = 0.7, title = NULL, position = "bottomright")
+```
+
