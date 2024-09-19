@@ -16,42 +16,142 @@ library(ggplot2)
 library(stringr)
 library(viridis)
 library(leaflet)
+library(datasets)
+
 ```
 
+# Loading in Data
+
 ```{r}
+#This package is from R's Datasets related to the 50 states of the USA.
+#It is about average state income in 1977 for the US. 
+income_states <- as.data.frame(state.x77)
+
+    #Steps taken to convert the rownames into an actual variable column for use later. 
+    names <- rownames(state.x77)
+
+    # Add the names vector as a new column to the data frame
+    income_states <- income_states |>
+      mutate(State = names) |>
+      select(State, Income)
+
+    # I wanted to remove the row names to look at the data more easily.
+    row.names(income_states) <- NULL
+
+#This data is from the library ggplot2 to make the static versions of the maps. 
 states_polygon <- as_tibble(map_data("state")) |>
   select(region, group, order, lat, long)
 
-states_sf <- read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson") 
+#This data is a simple features map for our interactive leaflet maps later on. 
+states_sf <- read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")     
 
-species <- read_csv("~/**SDS264/Sds 264 F24/Submit/240920 Mini-Project/species-listings-by-state-totals-report.csv") 
-head(species)
-dim(species)
+#This data is from the following website and has species listings by state based
+#if the species' spatial range is believed to be associated with that state. 
+#https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed
+species_states <- read_csv("~/***SDS264/Sds 264 F24/Submit/240920 Mini-Project/species-listings-by-state-totals-report.csv") 
 
-species <- species |>
-  group_by(State) |>
-  mutate(count100 = if_else(`Number of Species Listings` > 100, "More than 100", "Less than 100")) |>
-  filter(!State %in% c("Outlying Caribbean Islands", "Virgin Islands", "Outlying Pacific Islands", "Northern Mariana Islands", "American Samoa", "Guam")) |>
-  rename(numSpecies = `Number of Species Listings`)
 
-unique(species$State)
-unique(states_sf$name)
 
-species_states_sf <- states_sf |>
-  left_join(species, by = c("name" = "State")) |>
-  filter(!(name %in% c("Alaska", "Hawaii")))
+```
 
-species2 <- species |>
-  mutate(State = str_to_lower(State))
+Data Filtering and Joining
 
-species_states_polygon <- states_polygon |>
-  left_join(species2, by = c("region" = "State")) |>
-  filter(!(region %in% c("Alaska", "Hawaii")))
+```{r}
+#Polygon Maps
 
+  #For the species dataset, I wanted mainly the continental United States. 
+  species_states <- species_states |>
+    group_by(State) |>
+    filter(!State %in% c("Outlying Caribbean Islands", "Virgin Islands", "Outlying Pacific Islands", "Northern Mariana Islands", "American Samoa", "Guam")) |>
+    rename(numSpecies = `Number of Species Listings`)
+  
+  #For this dataset, I wanted to make different bins of income level for that state. 
+    breaks <- seq(3000, 6500, length.out = 6)  
+    labels <- c("$3000-3699", "$3700-4399", "$4400-5099", "$5100-5799", "$5800-6500")  # 5 labels
+    
+    income_states <- income_states |>
+      mutate(
+        income_bins = cut(
+          Income,
+          breaks = breaks,
+          labels = labels,
+          include.lowest = TRUE,
+          right = FALSE 
+        )
+      )
+
+
+```
+
+# Joining the Species and State Data with the Mapping Data
+
+```{r}
+#Polygon Maps
+
+  #Joining the species by state data to the polygon data.
+  
+    #First I will check the formatting of the states to align keys. 
+    unique(species_states$State)
+    unique(states_polygon$region) #This one is all lowercase.
+    
+    #Changing the keys to match.
+    species_states <- species_states |>
+      mutate(State = str_to_lower(State)
+      )
+    
+    #Now joining with a left_join
+    species_states_polygon <- states_polygon |> left_join(
+      species_states, 
+      by = c("region" = "State")
+    )
+    
+    #Checking if the states lined up
+    unique(species_states_polygon$region)
+    
+  #Joining the state income levels in 1977 with the polygon data using the
+  #same process.
+    
+    unique(income_states$State)
+    
+    income_states <- income_states |>
+      mutate(State = str_to_lower(State)
+      )
+    
+    income_states_polygon <- states_polygon |> left_join(
+      income_states, 
+      by = c("region" = "State")
+    )
+    
+    unique(income_states_polygon$region)
+    
+#Sf Maps, using the same process.    
+    
+  #Species data    
+  unique(states_sf$name)
+  unique(species_states$State)
+  
+  states_sf <- states_sf |>
+    mutate(name = str_to_lower(name))
+      
+  species_states_sf <- states_sf |>
+    left_join(species_states, by = c("name" = "State"))
+  
+  unique(species_states_sf)
+      
+
+  #State income data    
+  unique(states_sf$name)
+  unique(income_states$State)
+      
+  income_states_sf <- states_sf |>
+    left_join(income_states, by = c("name" = "State"))
+  
+  unique(income_states_sf)
 
 ```
 
 Numeric variable (static)
+
 ```{r}
 species_states_polygon |>
   ggplot(aes(x = long, y = lat, group = group))+
@@ -63,9 +163,12 @@ species_states_polygon |>
 ```
 
 Numeric Variable (interactive)
+
 ```{r}
+#I wanted to make labels that would show up when someone interacts with the map.
+#It coordinates to the name of the state as well as the number of species listed. 
 species_states_sf <- species_states_sf |>
-  mutate(labels = str_c(name, " - " ,numSpecies, " species listed"))
+  mutate(labels = str_c(name, " - ", numSpecies, " species listed"))
 
 leaflet(species_states_sf) |>
   setView(-96, 37.8, 4) |>
@@ -73,7 +176,7 @@ leaflet(species_states_sf) |>
   addPolygons(
     weight = 2,
     opacity = 0.8,
-    color = ~ colorNumeric("YlGnBu", species_states_sf$numSpecies)(species_states_sf$numSpecies),
+    color = ~colorNumeric("YlGnBu", numSpecies)(numSpecies),
     dashArray = "2",
     fillOpacity = 1,
     highlightOptions = highlightOptions(
@@ -81,41 +184,47 @@ leaflet(species_states_sf) |>
       color = "#666",
       dashArray = "",
       fillOpacity = 0.7,
-      bringToFront = TRUE),
-    label = species_states_sf$labels,
+      bringToFront = TRUE
+    ),
+    label = ~labels,  # Use the labels directly
     labelOptions = labelOptions(
       style = list("font-weight" = "normal", padding = "3px 8px"),
       textsize = "15px",
-      direction = "auto"))
+      direction = "auto"
+    )
+  )
 ```
 
 Categorical variable (static plot)
+
 ```{r}
-species_states_polygon |>
+income_states_polygon |>
   ggplot(aes(x = long, y = lat, group = group)) +
-  geom_polygon(aes(fill = count100), color = "black")+
+  geom_polygon(aes(fill = income_bins), color = "black")+
   coord_map() +
   theme_void() +
-  labs(fill = "Does the state have \nmore or less than \n100 listed species?") +
-  scale_fill_manual(values = c("#008000", "#AAFF00"))
+  scale_fill_viridis_d()
 ```
 
-
 Categorical variable (interactive plot)
-```{r}
-factpal <- colorFactor(
-  palette = c("#008000", "#AAFF00"),  
-  domain = c("Less than 100", "More than 100")
-)
 
-leaflet(species_states_sf) |>
+```{r}
+library(RColorBrewer)
+
+income_states_sf <- income_states_sf |>
+  mutate(labels = str_c(name, " - $", Income))
+
+# Define the color palette (ensure income_bins is defined)
+factpal <- colorFactor(palette = "YlGnBu", domain = income_states$income_bins)
+
+leaflet(income_states_sf) |>
   setView(-96, 37.8, 4) |>
   addTiles() |>
   addPolygons(
     weight = 2,
     opacity = 1,
     color = "black",
-    fillColor = ~ factpal(species_states_sf$count100),
+    fillColor = ~factpal(income_bins),  # Use income_bins directly
     dashArray = "3",
     fillOpacity = 0.7,
     highlightOptions = highlightOptions(
@@ -123,13 +232,20 @@ leaflet(species_states_sf) |>
       color = "#666",
       dashArray = "",
       fillOpacity = 0.7,
-      bringToFront = TRUE),
-    label = species_states_sf$count100,
+      bringToFront = TRUE
+    ),
+    label = ~labels,  # Use labels directly
     labelOptions = labelOptions(
       style = list("font-weight" = "normal", padding = "3px 8px"),
       textsize = "15px",
-      direction = "auto")) |>
-  addLegend(pal = factpal, values = ~species_states_sf$count100, 
-            opacity = 0.7, title = NULL, position = "bottomright")
+      direction = "auto"
+    )
+  ) |> 
+  addLegend(
+    pal = factpal, 
+    values = ~income_bins,  # Use income_bins directly
+    opacity = 0.7, 
+    title = NULL, 
+    position = "bottomright"
+  )
 ```
-
