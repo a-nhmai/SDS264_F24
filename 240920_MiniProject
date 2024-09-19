@@ -8,6 +8,7 @@ editor_options:
 ---
 
 ```{r setup, include=FALSE}
+#These are the libraries needed to create the maps and load in the data. 
 library(maps)
 library(sf)
 library(readr)
@@ -23,21 +24,6 @@ library(datasets)
 # Loading in Data
 
 ```{r}
-#This package is from R's Datasets related to the 50 states of the USA.
-#It is about average state income in 1977 for the US. 
-income_states <- as.data.frame(state.x77)
-
-    #Steps taken to convert the rownames into an actual variable column for use later. 
-    names <- rownames(state.x77)
-
-    # Add the names vector as a new column to the data frame
-    income_states <- income_states |>
-      mutate(State = names) |>
-      select(State, Income)
-
-    # I wanted to remove the row names to look at the data more easily.
-    row.names(income_states) <- NULL
-
 #This data is from the library ggplot2 to make the static versions of the maps. 
 states_polygon <- as_tibble(map_data("state")) |>
   select(region, group, order, lat, long)
@@ -50,40 +36,32 @@ states_sf <- read_sf("https://rstudio.github.io/leaflet/json/us-states.geojson")
 #https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed
 species_states <- read_csv("~/***SDS264/Sds 264 F24/Submit/240920 Mini-Project/species-listings-by-state-totals-report.csv") 
 
+#This dataset is from the Poliscidata in R and I specifcally wanted to look at which states weed policies. 
+#install.packages("poliscidata") -- Use this code if you haven't installed the package. 
+library(poliscidata)
 
+#This data is needed to load in the pot policy variable from the "states" data from the "Poliscidata" package.
+data("states")
+weed_law_states <- as.data.frame(states)
+weed_law_states <- weed_law_states |> 
+  select(state, pot_policy) |> 
+  mutate(state = str_replace_all(state, "(?<!^)(?=[A-Z])", " ")) |> #This adds a space before any capitalized letters. 
+  mutate(state = str_trim(state)) #This gets rid of spaces at the beginning of the observations. 
 
 ```
 
 Data Filtering and Joining
 
 ```{r}
-#Polygon Maps
-
-  #For the species dataset, I wanted mainly the continental United States. 
+#For the species dataset, I wanted mainly the continental United States. 
   species_states <- species_states |>
     group_by(State) |>
     filter(!State %in% c("Outlying Caribbean Islands", "Virgin Islands", "Outlying Pacific Islands", "Northern Mariana Islands", "American Samoa", "Guam")) |>
     rename(numSpecies = `Number of Species Listings`)
-  
-  #For this dataset, I wanted to make different bins of income level for that state. 
-    breaks <- seq(3000, 6500, length.out = 6)  
-    labels <- c("$3000-3699", "$3700-4399", "$4400-5099", "$5100-5799", "$5800-6500")  # 5 labels
-    
-    income_states <- income_states |>
-      mutate(
-        income_bins = cut(
-          Income,
-          breaks = breaks,
-          labels = labels,
-          include.lowest = TRUE,
-          right = FALSE 
-        )
-      )
-
 
 ```
 
-# Joining the Species and State Data with the Mapping Data
+# Joining the Species and Weed Law Data with the Mapping Data
 
 ```{r}
 #Polygon Maps
@@ -107,22 +85,23 @@ Data Filtering and Joining
     
     #Checking if the states lined up
     unique(species_states_polygon$region)
+  
     
-  #Joining the state income levels in 1977 with the polygon data using the
+  #Joining the weed laws with the polygon data using the
   #same process.
     
-    unique(income_states$State)
+    unique(weed_law_states$state)
     
-    income_states <- income_states |>
-      mutate(State = str_to_lower(State)
+    weed_law_states <- weed_law_states |>
+      mutate(State = str_to_lower(state)
       )
     
-    income_states_polygon <- states_polygon |> left_join(
-      income_states, 
-      by = c("region" = "State")
+    weed_law_polygon <- states_polygon |> left_join(
+      weed_law_states, 
+      by = c("region" = "state")
     )
     
-    unique(income_states_polygon$region)
+    unique(weed_law_polygon$region)
     
 #Sf Maps, using the same process.    
     
@@ -137,20 +116,22 @@ Data Filtering and Joining
     left_join(species_states, by = c("name" = "State"))
   
   unique(species_states_sf)
-      
-
-  #State income data    
-  unique(states_sf$name)
-  unique(income_states$State)
-      
-  income_states_sf <- states_sf |>
-    left_join(income_states, by = c("name" = "State"))
   
-  unique(income_states_sf)
+  #Weed Laws across states
+      
+  unique(states_sf$name)
+  unique(weed_law_states$state)
+      
+  weed_law_states_sf <- states_sf |>
+    left_join(weed_law_states, by = c("name" = "state"))
+  
+  unique(weed_law_states_sf)
+    
 
 ```
 
-Numeric variable (static)
+#Making the Numeric variable (static) map
+Data from [https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed]
 
 ```{r}
 species_states_polygon |>
@@ -158,11 +139,14 @@ species_states_polygon |>
   geom_polygon(aes(fill = numSpecies), color = "black")+
   theme_void()+
   scale_fill_viridis()+
-  labs(fill = "Number of listed species \nwith spatial current range \nbelieved to or known to \noccur",
-       caption = "https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed")
+  labs(title = "Listed species with current spatial range believed to or known to occur in states across the US",
+    fill = "Number of listed species",
+    subtitle = "Data from https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed",
+    caption = "This map shows there is a high number of species believed to have spatial range \n associated with California and regions in the South. More Northern regions have a lower number\n of species listed. This data may be limited to sampling accessibility and data collection biases. \nAdditionally, this map excludes Hawaii which has 490 listed species and Alaska with 8 listed species.")
 ```
 
-Numeric Variable (interactive)
+#Making the Numeric Variable (interactive) map
+Data from [https://ecos.fws.gov/ecp/report/species-listings-by-state-totals?statusCategory=Listed]
 
 ```{r}
 #I wanted to make labels that would show up when someone interacts with the map.
@@ -176,7 +160,8 @@ leaflet(species_states_sf) |>
   addPolygons(
     weight = 2,
     opacity = 0.8,
-    color = ~colorNumeric("YlGnBu", numSpecies)(numSpecies),
+    color = "black",  
+    fillColor = ~colorNumeric("Greens", numSpecies)(numSpecies),
     dashArray = "2",
     fillOpacity = 1,
     highlightOptions = highlightOptions(
@@ -192,39 +177,50 @@ leaflet(species_states_sf) |>
       textsize = "15px",
       direction = "auto"
     )
-  )
+  ) |>
+  addControl("<strong>Listed species with current spatial range believed to or known to occur in states across the US</strong>", position = "topright") |>
+  addControl("From this map, we see a large concentration of species with current spatial ranges in California and southern regions of the United States. There is a possibility that more sampling occurs in these areas and can inflate species observations. Thus, this map should not be taken as a biodiversity distribution map.", position = "bottomleft")
 ```
 
-Categorical variable (static plot)
+#Making the Categorical variable (static plot) map
+Data from R Package [Poliscidata]
+
+Alt-Text for this Plot
+
+-   This is a map of the continental United States that shows the policy of weed by state. Lighter colors indicate legislation that is pending or has ruled for the illegalization of weed. Darker colors indicate the legalization of medicinal weed or entire decriminalization of weed. On the West coast, there is a pattern of decriminalization whereas most Midwestern or Southern states have ruled for weed to be illegal. On the East coast, near the New England area, more states are ruling for the decriminalization of cannibas as well. 
 
 ```{r}
-income_states_polygon |>
+weed_law_polygon |>
   ggplot(aes(x = long, y = lat, group = group)) +
-  geom_polygon(aes(fill = income_bins), color = "black")+
+  geom_polygon(aes(fill = pot_policy), color = "black")+
   coord_map() +
   theme_void() +
-  scale_fill_viridis_d()
+  scale_fill_manual(values = c("#ffffcc", "#c2e699", "#78c679", "#31a354", "#006837"))+
+  labs(title = "Weed Policy",
+       caption = "Data from R Package [Poliscidata]",
+       fill = "Status")
 ```
 
-Categorical variable (interactive plot)
+#Making the Categorical variable (interactive plot) map
+Data from R Package [Poliscidata]
 
 ```{r}
 library(RColorBrewer)
 
-income_states_sf <- income_states_sf |>
-  mutate(labels = str_c(name, " - $", Income))
+weed_law_states_sf <- weed_law_states_sf |>
+  mutate(labels = str_c(name, " : ", pot_policy))
 
 # Define the color palette (ensure income_bins is defined)
-factpal <- colorFactor(palette = "YlGnBu", domain = income_states$income_bins)
+factpal <- colorFactor(palette = "YlGn", domain = weed_law_states_sf$pot_policy)
 
-leaflet(income_states_sf) |>
+leaflet(weed_law_states_sf) |>
   setView(-96, 37.8, 4) |>
   addTiles() |>
   addPolygons(
     weight = 2,
     opacity = 1,
     color = "black",
-    fillColor = ~factpal(income_bins),  # Use income_bins directly
+    fillColor = ~factpal(pot_policy),  
     dashArray = "3",
     fillOpacity = 0.7,
     highlightOptions = highlightOptions(
@@ -243,9 +239,12 @@ leaflet(income_states_sf) |>
   ) |> 
   addLegend(
     pal = factpal, 
-    values = ~income_bins,  # Use income_bins directly
+    values = ~pot_policy,  
     opacity = 0.7, 
     title = NULL, 
     position = "bottomright"
-  )
+  ) |>
+  addControl("<strong>Weed Law Status across the U.S.</strong>", position = "topright") |>
+  addControl("This is a map showing the different weed law rulings across the United States. On the West Coast, most states have legalized and  decriminalized weed whereas more Southern and Midwestern states have illegal rulings or are still litigating over their approach.", position = "bottomleft")
 ```
+
