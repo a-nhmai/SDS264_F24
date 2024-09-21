@@ -98,7 +98,7 @@ Data Filtering and Joining
     
     weed_law_polygon <- states_polygon |> left_join(
       weed_law_states, 
-      by = c("region" = "state")
+      by = c("region" = "State")
     )
     
     unique(weed_law_polygon$region)
@@ -120,10 +120,10 @@ Data Filtering and Joining
   #Weed Laws across states
       
   unique(states_sf$name)
-  unique(weed_law_states$state)
+  unique(weed_law_states$State)
       
   weed_law_states_sf <- states_sf |>
-    left_join(weed_law_states, by = c("name" = "state"))
+    left_join(weed_law_states, by = c("name" = "State"))
   
   unique(weed_law_states_sf)
     
@@ -207,6 +207,7 @@ Data from R Package [Poliscidata]
 ```{r}
 library(RColorBrewer)
 
+#These labels will be useful for the leaflet later. 
 weed_law_states_sf <- weed_law_states_sf |>
   mutate(labels = str_c(name, " : ", pot_policy))
 
@@ -230,7 +231,7 @@ leaflet(weed_law_states_sf) |>
       fillOpacity = 0.7,
       bringToFront = TRUE
     ),
-    label = ~labels,  # Use labels directly
+    label = ~labels,  
     labelOptions = labelOptions(
       style = list("font-weight" = "normal", padding = "3px 8px"),
       textsize = "15px",
