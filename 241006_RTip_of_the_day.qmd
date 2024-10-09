@@ -1,0 +1,235 @@
+---
+title: "The Highcharter package"
+subtitle: "Anh Mai"
+format:
+  revealjs: 
+    slide-number: true
+    chalkboard: 
+      buttons: false
+    preview-links: auto
+    logo: images/quarto.png
+    css: styles.css
+    footer: <https://quarto.org>
+    incremental: true  
+    theme : simple
+resources:
+  - demo.pdf
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r, include = FALSE}
+#install.packages("highcharter")
+library(highcharter)
+data(penguins, package = "palmerpenguins") 
+```
+
+---
+
+## The Highcharter package
+
+::: {.incremental}
+- Make plots (scatterplots, heatmaps, tree maps, etc.)
+- Interactive component (zooming, hovering for more info, and more)
+- Plots are configured simply
+- Customize theme, titles, legends, tooltips, etc.
+:::
+
+---
+
+## The hcaes Function
+
+::: {.incremental}
+
+```{.r}
+hcaes(x, y, ...)
+```
+
+-  "Similar in spirit to ggplot2::aes"
+-   used for mapping variables 
+-   can also use color and group here as well
+
+:::
+
+---
+
+## The hchart Function
+
+::: {.incremental}
+
+```{.r}
+hchart(df,
+       "series",
+        hcaes(x, y),
+        name = "name")
+```
+
+-   assigning the 'series' of plot and the variables to use
+-   different series: venn, polygon, pie, line, histogram, heatmap, errorbar, boxplot, bar, area
+-   use name to customize labels on individual data points
+:::
+
+---
+
+## Building different plot elements
+
+::: {.incremental}
+
+```{.r code-line-numbers="|4|5|6|8|9|10|11|12|13"}
+hchart(
+  df,
+  "series",
+  hcaes(x, y, group),
+  color = color,
+  name = "name",
+) |>
+  hc_title(text = "title") |>
+  hc_subtitle(text = "text") |>
+  hc_xAxis(title = list(text = "text")) |>
+  hc_yAxis(title = list(text = "text")) |>
+  hc_add_theme(theme_name) |>
+  hc_tooltip(formatter = JS("function(){return this.variable + ' Custom Label';}"))
+```
+
+-   very buildable
+-   uses pipes, lists, some customizable formatting for tool tips
+:::
+
+---
+
+## Example Code
+
+```{.r code-line-numbers="|1|2|3|4"}
+hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species)
+)
+```
+
+---
+
+## Example Plot
+
+```{r}
+highcharter::hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species)
+)
+```
+
+
+---
+
+## Example Code (customize color and add names to data)
+
+```{.r code-line-numbers="|5|6"}
+hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species),
+  color = (c("blue","red","green")),
+  name = "Penguin measurements"
+)
+```
+
+---
+
+## Execute Code
+
+```{.r}
+hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species),
+  color = (c("blue","red","green")),
+  name = "Penguin measurements"
+)
+```
+
+```{r}
+hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species),
+  color = (c("blue","red","green")),
+  name = "Penguin measurements"
+)
+```
+
+## Labeling our plot with more detail
+
+```{.r code-line-numbers="|7|8|9|10|11|12"}
+hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species),
+  color = (c("blue","red","green")),
+) |>
+  hc_title(text = "Strong Positive Relationship between Flipper and Bill Length") |>
+  hc_subtitle(text = "Source: Palmer Penguins") |>
+  hc_xAxis(title = list(text = "Flipper Length (mm)")) |>
+  hc_yAxis(title = list(text = "Beak Length (mm)")) |>
+  hc_add_theme(hc_theme_smpl()) |>
+  hc_tooltip(formatter = JS("function(){return this.point.island + ' Island';}"))
+
+```
+
+---
+
+## The plot!
+
+```{r}
+hchart(
+  penguins,
+  "scatter",
+  hcaes(x = flipper_length_mm, y = bill_length_mm, group = species),
+  color = (c("blue","red","green"))
+) |>
+  hc_title(text = "Strong Positive Relationship between Flipper and Bill Length in Penguins near Palmer Station, Antarctica") |>
+  hc_subtitle(text = "Source: Palmer Penguins") |>
+  hc_xAxis(title = list(text = "Flipper Length (mm)")) |>
+  hc_yAxis(title = list(text = "Beak Length (mm)")) |>
+  hc_add_theme(hc_theme_smpl()) |>
+  hc_tooltip(formatter = JS("function(){return this.point.island + ' Island';}"))
+```
+
+---
+
+## Thanks!
+
+Any questions?
+Here's the code we covered today!
+
+::: aside 
+Sources:
+https://www.datanovia.com/en/lessons/highchart-interactive-scatter-plot-in-r/#google_vignette, https://jkunst.com/highcharter/reference/index.html
+
+:::
+<style>
+  .column {
+    line-height: 1.2;
+  }
+</style>
+
+:::: {.columns}
+
+::: {.column width="40%"}
+hcaes()  
+hchart()  
+hc_title()  
+hc_subtitle()  
+hc_xAxis()  
+hc_yAxis()  
+hc_add_theme()  
+hc_tooltip()  
+:::
+
+::: {.column width="60%"}
+Mapping function  
+Function to create plot  
+Labeling  
+:::
+
+::::
